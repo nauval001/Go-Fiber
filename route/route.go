@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"api-students/app/service"
 	"api-students/helper"
@@ -22,13 +23,19 @@ type Dependencies struct {
 	StudentSvc   *service.StudentService
 	AuthSvc      *service.AuthService
 	SupervisorService *service.SupervisorService
+	PortfolioService *service.PortfolioService
+	Mongo             *mongo.Client
 }
 
 func Register(app *fiber.App, deps Dependencies) {
 	api := app.Group("/api/v1")
 
 	// --- publik ---
-	api.Get("/health", healthCheck(deps.Pool))
+	api.Get("/health", healthCheck(deps.Pool, deps.Mongo))
+	api.Get("/portfolios/stats/technologies", 
+		middleware.RequireAuth(deps.JWT), 
+		deps.PortfolioService.StatsTechnologies,
+	)
 
 	// --- autentikasi ---
 	auth := api.Group("/auth", middleware.RequireJSON)
@@ -61,18 +68,25 @@ func Register(app *fiber.App, deps Dependencies) {
 	sup := api.Group("/supervisors", middleware.RequireJSON, middleware.RequireAuth(deps.JWT))
 	sup.Post("/:id/assign", middleware.RequirePermission(deps.Permissions, "student:create"), deps.SupervisorService.Assign)
 	sup.Patch("/:id", middleware.RequirePermission(deps.Permissions, "student:update:any"), deps.SupervisorService.UpdateQuota)
+	portfolios := api.Group("/students/:id/portfolio", middleware.RequireJSON, middleware.RequireAuth(deps.JWT))
+	portfolios.Get("", deps.PortfolioService.Get)
+	portfolios.Put("", deps.PortfolioService.Upsert)
+	portfolios.Post("/projects", deps.PortfolioService.AddProject)
+	portfolios.Delete("/projects/:projectId", deps.PortfolioService.DeleteProject)
 }
 
-func healthCheck(pool *pgxpool.Pool) fiber.Handler {
+func healthCheck(pool *pgxpool.Pool, mongoClient *mongo.Client) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
 		defer cancel()
 
 		if err := pool.Ping(ctx); err != nil {
-			return helper.Fail(c, fiber.StatusServiceUnavailable,
-				"database tidak dapat dihubungi")
+			return helper.ServiceUnavailable("PostgreSQL tidak dapat dihubungi")
+		}
+		if err := mongoClient.Ping(ctx, nil); err != nil {
+			return helper.ServiceUnavailable("MongoDB tidak dapat dihubungi")
 		}
 
-		return helper.Success(c, fiber.StatusOK, "server dan database berjalan", nil)
+		return helper.Success(c, fiber.StatusOK, "server, PostgreSQL, dan MongoDB berjalan", nil)
 	}
 }

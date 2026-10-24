@@ -69,6 +69,8 @@ func (s *SupervisorService) Assign(c *fiber.Ctx) error {
 			return helper.Conflict("kuota pembimbing sudah penuh")
 		case errors.Is(err, repository.ErrDuplicate):
 			return helper.Conflict("mahasiswa sudah memiliki pembimbing")
+		case errors.Is(err, repository.ErrNotFound):
+			return helper.NotFound("mahasiswa atau pembimbing tidak ditemukan")
 		default:
 			return helper.Internal(err)
 		}

@@ -40,6 +40,19 @@ func main() {
 	}
 	defer pool.Close()
 
+		// Setup MongoDB
+	mongoClient, err := database.NewMongoClient(context.Background())
+	if err != nil {
+		logger.Error("gagal terhubung ke MongoDB", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = mongoClient.Disconnect(ctx)
+	}()
+	mongoDB := mongoClient.Database(config.GetEnv("MONGO_DATABASE", "praktikum_backend"))
+
 	// 3. JWT Manager
 	jwtManager := helper.NewJWTManager(
 		jwtSecret,
@@ -61,7 +74,11 @@ func main() {
 	studentRepository := repository.NewStudentRepository(pool)
 	userRepository := repository.NewUserRepository(pool)
 	tokenRepository := repository.NewTokenRepository(pool)
-
+	portfolioRepo := repository.NewPortfolioRepository(mongoDB)
+	if err := portfolioRepo.EnsureIndexes(context.Background()); err != nil {
+		logger.Error("gagal membuat index MongoDB", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 	// 5. Service
 	studentService := service.NewStudentService(studentRepository, permissions)
 	authService := service.NewAuthService(
@@ -78,6 +95,9 @@ func main() {
 	supervisorRepo := repository.NewSupervisorRepository(pool)
 	supervisorService := service.NewSupervisorService(supervisorRepo, txManager)
 
+	// Tambahkan inisialisasi Portfolio
+	portfolioService := service.NewPortfolioService(portfolioRepo, studentRepository)
+
 	// 6. Aplikasi
 	app := config.NewApp(logger, pool, route.Dependencies{
 		Pool:        pool,
@@ -86,6 +106,8 @@ func main() {
 		StudentSvc:  studentService,
 		AuthSvc:     authService,
 		SupervisorService: supervisorService,
+		PortfolioService: portfolioService,
+		Mongo:             mongoClient,
 	})
 
 	port := config.GetEnv("APP_PORT", "3000")
