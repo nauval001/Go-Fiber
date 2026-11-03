@@ -10,8 +10,6 @@ import (
 var (
 	ErrSupervisorFull     = errors.New("kuota pembimbing penuh")
 	ErrNotAssigned        = errors.New("tidak ada bimbingan")
-	ErrVersionConflict    = errors.New("data sudah diubah pihak lain")
-	ErrQuotaBelowFilled   = errors.New("kuota lebih kecil dari jumlah bimbingan")
 )
 
 type SupervisorRepository interface {

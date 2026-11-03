@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 
 	"api-students/app/repository"
 	"api-students/helper"
@@ -46,7 +45,7 @@ func (s *SupervisorService) Assign(c *fiber.Ctx) error {
 	if errs := helper.ValidateStruct(req); errs != nil { return helper.Validation(errs) }
 
 	// Gunakan Transaction
-	err := s.tx.WithTx(ctx, func(tx pgx.Tx) error {
+	err := s.tx.WithTx(ctx, func(tx repository.DBTX) error {
 		repo := s.repo.WithTx(tx)
 
 		// Kunci mahasiswa agar tidak bisa di-assign dua kali secara paralel
@@ -88,7 +87,7 @@ func (s *SupervisorService) Switch(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil { return helper.BadRequest("JSON tidak valid") }
 	if errs := helper.ValidateStruct(req); errs != nil { return helper.Validation(errs) }
 
-	err := s.tx.WithTx(ctx, func(tx pgx.Tx) error {
+	err := s.tx.WithTx(ctx, func(tx repository.DBTX) error {
 		repo := s.repo.WithTx(tx)
 
 		if err := repo.LockStudent(ctx, req.StudentID); err != nil {

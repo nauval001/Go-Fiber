@@ -25,6 +25,8 @@ type Dependencies struct {
 	SupervisorService *service.SupervisorService
 	PortfolioService *service.PortfolioService
 	Mongo             *mongo.Client
+	CourseService       *service.CourseService
+	NotificationService *service.NotificationService
 }
 
 func Register(app *fiber.App, deps Dependencies) {
@@ -73,6 +75,25 @@ func Register(app *fiber.App, deps Dependencies) {
 	portfolios.Put("", deps.PortfolioService.Upsert)
 	portfolios.Post("/projects", deps.PortfolioService.AddProject)
 	portfolios.Delete("/projects/:projectId", deps.PortfolioService.DeleteProject)
+
+	// --- kelas dan KRS ---
+	courses := api.Group("/courses", middleware.RequireJSON, middleware.RequireAuth(deps.JWT))
+	courses.Get("/", deps.CourseService.List)
+	courses.Get("/mine", deps.CourseService.Mine)
+	courses.Get("/:id", deps.CourseService.Get)
+	courses.Post("/:id/enroll", deps.CourseService.Enroll)
+	courses.Delete("/:id/enroll", deps.CourseService.Drop)
+	courses.Patch("/:id", middleware.RequirePermission(deps.Permissions, "course:manage"), deps.CourseService.UpdateQuota)
+
+	api.Post("/enrollments/swap", middleware.RequireJSON, middleware.RequireAuth(deps.JWT), deps.CourseService.Swap)
+
+	// --- notifikasi (Modul 11) ---
+	notifications := api.Group("/notifications", middleware.RequireJSON, middleware.RequireAuth(deps.JWT))
+	notifications.Get("/mine", deps.NotificationService.Mine)
+
+	admin := api.Group("/admin", middleware.RequireJSON, middleware.RequireAuth(deps.JWT))
+	admin.Get("/queue", middleware.RequirePermission(deps.Permissions, "queue:monitor"), deps.NotificationService.Monitor)
+
 }
 
 func healthCheck(pool *pgxpool.Pool, mongoClient *mongo.Client) fiber.Handler {

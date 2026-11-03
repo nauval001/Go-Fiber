@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -19,7 +18,8 @@ func NewTxManager(pool *pgxpool.Pool) *TxManager {
 	return &TxManager{pool: pool, maxAttempts: 3}
 }
 
-func (m *TxManager) WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+// WithTx menjalankan fn di dalam transaksi dengan mekanisme retry.
+func (m *TxManager) WithTx(ctx context.Context, fn func(tx DBTX) error) error {
 	var err error
 	for attempt := 1; attempt <= m.maxAttempts; attempt++ {
 		err = m.runOnce(ctx, fn)
@@ -36,12 +36,16 @@ func (m *TxManager) WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error 
 	return err
 }
 
-func (m *TxManager) runOnce(ctx context.Context, fn func(tx pgx.Tx) error) error {
+// WithTxOnce sama dengan WithTx, tetapi TIDAK PERNAH melakukan retry.
+func (m *TxManager) WithTxOnce(ctx context.Context, fn func(tx DBTX) error) error {
+	return m.runOnce(ctx, fn)
+}
+
+func (m *TxManager) runOnce(ctx context.Context, fn func(tx DBTX) error) error {
 	tx, err := m.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("memulai transaction: %w", err)
 	}
-	// PERBAIKAN BUG: Rollback harus selalu di-defer
 	defer tx.Rollback(ctx)
 
 	if err := fn(tx); err != nil {
