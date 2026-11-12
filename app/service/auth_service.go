@@ -80,6 +80,18 @@ func (s *AuthService) Register(c *fiber.Ctx) error {
 // ================================================================
 // POST /api/v1/auth/login
 // ================================================================
+
+// Login godoc
+// @Summary Login dan mendapatkan pasangan token
+// @Description Dibatasi 5 kali gagal per menit per IP.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body model.LoginRequest true "Username dan password"
+// @Success 200 {object} model.WebResponse{data=model.TokenPair}
+// @Failure 401 {object} model.ErrorResponse "Username atau password salah"
+// @Failure 429 {object} model.ErrorResponse "Terlalu banyak percobaan login"
+// @Router /auth/login [post]
 func (s *AuthService) Login(c *fiber.Ctx) error {
 	ctx, cancel := helper.RequestContext(c)
 	defer cancel()

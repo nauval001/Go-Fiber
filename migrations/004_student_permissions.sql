@@ -44,7 +44,6 @@ ALTER TABLE users ADD CONSTRAINT users_role_fkey FOREIGN KEY (role) REFERENCES r
 
 -- 3. Tambah owner_id di tabel students
 -- HATI-HATI: Kita kosongkan data students lama agar bisa menambahkan NOT NULL constraint
-TRUNCATE students RESTART IDENTITY CASCADE;
 
-ALTER TABLE students ADD COLUMN owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS students_owner_id_idx ON students(owner_id);

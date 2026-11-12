@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/gofiber/swagger"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"api-students/app/service"
@@ -26,12 +27,17 @@ type Dependencies struct {
 	PortfolioService *service.PortfolioService
 	Mongo             *mongo.Client
 	CourseService       *service.CourseService
+	ReviewService       *service.ReviewService
 	NotificationService *service.NotificationService
+	EnableSwagger bool
 }
 
 func Register(app *fiber.App, deps Dependencies) {
 	api := app.Group("/api/v1")
 
+	if deps.EnableSwagger {
+		app.Get("/swagger/*", swagger.HandlerDefault)
+	}
 	// --- publik ---
 	api.Get("/health", healthCheck(deps.Pool, deps.Mongo))
 	api.Get("/portfolios/stats/technologies", 
@@ -84,6 +90,8 @@ func Register(app *fiber.App, deps Dependencies) {
 	courses.Post("/:id/enroll", deps.CourseService.Enroll)
 	courses.Delete("/:id/enroll", deps.CourseService.Drop)
 	courses.Patch("/:id", middleware.RequirePermission(deps.Permissions, "course:manage"), deps.CourseService.UpdateQuota)
+	courses.Get("/:id/reviews", deps.ReviewService.ListByCourse)
+	courses.Post("/:id/reviews", deps.ReviewService.Create)
 
 	api.Post("/enrollments/swap", middleware.RequireJSON, middleware.RequireAuth(deps.JWT), deps.CourseService.Swap)
 

@@ -96,7 +96,7 @@ func (r *coursePostgresRepository) FindByStudent(ctx context.Context, userID int
 
 func (r *coursePostgresRepository) LockStudent(ctx context.Context, userID int) error {
 	var id int
-	err := r.db.QueryRow(ctx, "SELECT id FROM students WHERE id = $1 FOR UPDATE", userID).Scan(&id)
+	err := r.db.QueryRow(ctx, "SELECT id FROM users WHERE id = $1 FOR UPDATE", userID).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
@@ -136,7 +136,7 @@ func (r *coursePostgresRepository) SumCredits(ctx context.Context, userID int) (
 func (r *coursePostgresRepository) IncrementEnrolled(ctx context.Context, courseID int) (model.Course, error) {
 	c, err := scanCourse(r.db.QueryRow(ctx, `
 		UPDATE courses SET enrolled_count = enrolled_count + 1
-		WHERE id = $1 AND enrolled_count <= quota
+		WHERE id = $1 AND enrolled_count < quota
 		RETURNING `+courseColumns, courseID))
 	if err == nil {
 		return c, nil
